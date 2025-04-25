@@ -1,0 +1,96 @@
+from tkinter import *
+from tkinter import messagebox
+import speech_recognition as sr
+import mysql.connector
+from datetime import datetime
+
+# MySQL Config (Replace with your password)
+DB_CONFIG = {
+    "host": "localhost",
+    "user": "root",
+    "password": "add your password",
+    "database": "add the db name"
+}
+
+# Create Database and Table if not exists
+def setup_database():
+    conn = mysql.connector.connect(
+        host=DB_CONFIG["host"], user=DB_CONFIG["user"], password=DB_CONFIG["password"]
+    )
+    cursor = conn.cursor()
+    cursor.execute("CREATE DATABASE IF NOT EXISTS attendance_system")
+    cursor.execute("USE attendance_system")
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS attendance (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            name VARCHAR(100),
+            time DATETIME
+        )
+    """)
+    conn.commit()
+    conn.close()
+
+# Function to mark attendance
+def mark_attendance(name):
+    conn = mysql.connector.connect(**DB_CONFIG)
+    cursor = conn.cursor()
+    now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    query = "INSERT INTO attendance (name, time) VALUES (%s, %s)"
+    cursor.execute(query, (name, now))
+    conn.commit()
+    conn.close()
+    messagebox.showinfo("Attendance Marked", f"✅ Attendance marked for {name}")
+
+# Function to check attendance
+def show_record(name):
+    conn = mysql.connector.connect(**DB_CONFIG)
+    cursor = conn.cursor()
+    query = "SELECT * FROM attendance WHERE name = %s"
+    cursor.execute(query, (name,))
+    results = cursor.fetchall()
+    conn.close()
+    if results:
+        messagebox.showinfo("Record Found", f"✅ {name} has {len(results)} record(s).")
+    else:
+        messagebox.showwarning("Not Found", f"❌ No attendance found for {name}.")
+
+# Voice Input Function
+def listen_and_mark():
+    recognizer = sr.Recognizer()
+    with sr.Microphone() as source:
+        messagebox.showinfo("Speak", "🎤 Say your name clearly...")
+        audio = recognizer.listen(source)
+    try:
+        name = recognizer.recognize_google(audio)
+        mark_attendance(name)
+    except sr.UnknownValueError:
+        messagebox.showerror("Error", "Couldn't understand the audio.")
+    except sr.RequestError:
+        messagebox.showerror("Error", "Speech recognition service error.")
+
+def listen_and_check():
+    recognizer = sr.Recognizer()
+    with sr.Microphone() as source:
+        messagebox.showinfo("Speak", "🎤 Say the name to check...")
+        audio = recognizer.listen(source)
+    try:
+        name = recognizer.recognize_google(audio)
+        show_record(name)
+    except sr.UnknownValueError:
+        messagebox.showerror("Error", "Couldn't understand the audio.")
+    except sr.RequestError:
+        messagebox.showerror("Error", "Speech recognition service error.")
+
+# GUI Setup
+setup_database()
+root = Tk()
+root.title("Voice-Based Attendance System")
+root.geometry("400x250")
+root.config(bg="#f0faff")
+
+Label(root, text="🎙 Press and Speak", font=("Helvetica", 16, "bold"), bg="#f0faff").pack(pady=20)
+
+Button(root, text="Mark Attendance", command=listen_and_mark, font=("Arial", 12), bg="#a5d6a7", width=25).pack(pady=10)
+Button(root, text="Check Attendance", command=listen_and_check, font=("Arial", 12), bg="#81d4fa", width=25).pack(pady=10)
+
+root.mainloop()
